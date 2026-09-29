@@ -1,0 +1,65 @@
+---
+import TrackCard from '../components/TrackCard.astro';
+import { supabase } from '../lib/supabase';
+import type { Track } from '../types';
+
+// 1. Consultamos los audios a Supabase (ordenados por los más recientes)
+const { data: tracks, error } = await supabase
+  .from('tracks')
+  .select('*')
+  .order('created_at', { ascending: false });
+
+// Si hay un error en la consola, nos avisará
+if (error) {
+  console.error('Error al obtener los audios:', error.message);
+}
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <title>CSMTrumpetRecords</title>
+  </head>
+  <body className="bg-neutral-950 text-white min-h-screen font-sans">
+    <header className="border-b border-neutral-800 bg-neutral-900/50 backdrop-blur py-6">
+      <div className="max-w-5xl mx-auto px-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+          CSMTrumpetRecords
+        </h1>
+        <span className="text-xs bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full border border-neutral-700">
+          Grabaciones en mp3 del aula de Trompeta del CSM de Sevilla
+        </span>
+      </div>
+    </header>
+
+    <main className="max-w-5xl mx-auto px-4 py-10">
+      <section className="mb-8">
+        <h2 className="text-xl font-bold text-neutral-200">Grabaciones</h2>
+        <p className="text-neutral-400 text-sm mt-1">Escucha directamente en la web o descarga los archivos en tu dispositivo.</p>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        {/* Manejo de estado: Error */}
+        {error && (
+          <div className="p-4 bg-red-900/20 border border-red-500/50 text-red-400 rounded-lg text-center">
+            Hubo un problema al cargar el catálogo de audios.
+          </div>
+        )}
+
+        {/* Manejo de estado: Vacío */}
+        {tracks && tracks.length === 0 && !error && (
+          <div className="p-12 text-center border border-dashed border-neutral-800 rounded-xl text-neutral-500">
+            Todavía no hay audios subidos. ¡Añade tu primer MP3 en Supabase!
+          </div>
+        )}
+
+        {/* Renderizado de la lista real */}
+        {tracks && tracks.map((track: Track) => (
+          <TrackCard track={track} />
+        ))}
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,49 @@
+---
+import type { Track } from '../types';
+import { Download } from 'lucide-astro';
+
+interface Props {
+  track: Track;
+}
+
+const { track } = Astro.props;
+---
+
+<article className="bg-neutral-900 border border-neutral-800 rounded-xl p-5 hover:border-neutral-700 transition flex flex-col md:flex-row items-center justify-between gap-4">
+  <!-- Info de la pista -->
+  <div className="flex items-center gap-4 w-full md:w-1/3">
+    {track.cover_url ? (
+      <img src={track.cover_url} alt={track.title} className="w-14 h-14 rounded-lg object-cover" />
+    ) : (
+      <div className="w-14 h-14 rounded-lg bg-neutral-800 flex items-center justify-center text-xs text-neutral-500">
+        MP3
+      </div>
+    )}
+    <div>
+      <h3 className="font-semibold text-white text-lg leading-tight">{track.title}</h3>
+      <p className="text-sm text-neutral-400 mt-1">{track.artist}</p>
+    </div>
+  </div>
+
+  <!-- Reproductor Nactivo -->
+  <div className="w-full md:w-1/2">
+    <audio controls className="w-full h-10 rounded-lg accent-indigo-500">
+      <source src={track.audio_url} type="audio/mpeg" />
+      Tu navegador no soporta el reproductor de audio.
+    </audio>
+  </div>
+
+  <!-- Botón de Descarga -->
+  <div>
+    <a
+      href={track.audio_url}
+      download={`${track.title}.mp3`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition"
+    >
+      <Download size={18} />
+      <span>Descargar</span>
+    </a>
+  </div>
+</article>
