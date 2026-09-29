@@ -7,6 +7,10 @@ interface Props {
 }
 
 const { track } = Astro.props;
+// "1º Movement" -> "1.er movimiento"
+const label = track.title.replace(/(\d)\s*º\s*Movement/i, (_, n) => `${n}.${n === '1' || n === '3' ? 'er' : 'º'} movimiento`);
+const chip =
+  'text-[11px] px-2 py-1 rounded-md border border-neutral-700 text-neutral-300 hover:bg-neutral-800 transition focus-visible:outline-2 focus-visible:outline-indigo-400 aria-pressed:border-indigo-500 aria-pressed:text-indigo-300';
 ---
 
 <article
@@ -14,59 +18,58 @@ const { track } = Astro.props;
   data-title={track.title.toLowerCase()}
   data-artist={track.artist.toLowerCase()}
 >
-  <!-- Información del Audio -->
   <div class="flex items-center gap-4 min-w-55">
     {track.cover_url ? (
-      <img src={track.cover_url} alt={track.title} class="w-12 h-12 rounded-lg object-cover shrink-0" />
+      <img src={track.cover_url} alt="" class="w-12 h-12 rounded-lg object-cover shrink-0" />
     ) : (
       <div class="w-12 h-12 rounded-lg bg-neutral-800 border border-neutral-700/50 flex items-center justify-center text-indigo-400 shrink-0">
         <Music size={22} />
       </div>
     )}
     <div class="overflow-hidden">
-      <h3 class="font-semibold text-white text-base truncate leading-tight">{track.title}</h3>
+      <h3 class="font-semibold text-white text-base truncate leading-tight" title={label}>{label}</h3>
       <p class="text-xs text-neutral-400 truncate mt-1">{track.artist}</p>
     </div>
   </div>
 
-  <!-- Reproductor Personalizado -->
   <div class="custom-player flex-1 flex items-center gap-3 bg-neutral-950/60 p-2.5 px-4 rounded-lg border border-neutral-800/80">
     <audio class="audio-element" src={track.audio_url} preload="metadata"></audio>
 
     <button
       type="button"
-      class="play-btn bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-full transition-transform active:scale-95 shrink-0"
-      aria-label="Reproducir"
+      class="play-btn bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-full transition-transform active:scale-95 shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
+      aria-label={`Reproducir ${label}`}
     >
       <span class="play-icon"><Play size={18} class="fill-current" /></span>
       <span class="pause-icon hidden"><Pause size={18} class="fill-current" /></span>
     </button>
 
-    <!-- Barra de Progreso y Tiempos -->
-    <div class="flex-1 flex flex-col gap-1">
+    <div class="flex-1 flex flex-col gap-2 min-w-0">
       <input
         type="range"
-        class="progress-bar w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+        class="progress-bar w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400"
+        aria-label="Posición de reproducción"
         value="0"
         min="0"
         max="100"
         step="0.1"
       />
-      <div class="flex justify-between text-[11px] text-neutral-400 font-mono">
+      <div class="flex items-center justify-between gap-2 text-[11px] text-neutral-400 font-mono">
         <span class="current-time">0:00</span>
+        <div class="flex gap-1.5 font-sans">
+          <button type="button" class={`speed-btn ${chip}`} aria-label="Cambiar velocidad de reproducción">1×</button>
+          <button type="button" class={`loop-btn ${chip}`} aria-pressed="false" title="Marca el inicio (A) y el final (B) de un pasaje para repetirlo">Bucle A-B</button>
+        </div>
         <span class="duration-time">0:00</span>
       </div>
     </div>
   </div>
 
-  <!-- Botón de Descarga -->
   <div class="flex items-center justify-end">
     <a
-      href={track.audio_url}
-      download={`${track.title}.mp3`}
-      target="_blank"
-      rel="noopener noreferrer"
-      class="inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white px-3.5 py-2.5 rounded-lg font-medium text-xs border border-neutral-700 transition"
+      href={`/api/download/${track.id}`}
+      aria-label={`Descargar ${label}`}
+      class="inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white px-3.5 py-2.5 rounded-lg font-medium text-xs border border-neutral-700 transition focus-visible:outline-2 focus-visible:outline-indigo-400"
     >
       <Download size={15} />
       <span class="hidden sm:inline">Descargar</span>
@@ -75,83 +78,78 @@ const { track } = Astro.props;
 </article>
 
 <script>
-  function initAudioPlayers() {
-    const cards = document.querySelectorAll('.track-card');
+  const SPEEDS = [1, 0.9, 0.75, 0.5];
+  const fmt = (s: number) => (isNaN(s) ? '0:00' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`);
 
-    cards.forEach((card) => {
-      const audio = card.querySelector('.audio-element') as HTMLAudioElement;
-      const playBtn = card.querySelector('.play-btn') as HTMLButtonElement;
-      const playIcon = card.querySelector('.play-icon') as HTMLElement;
-      const pauseIcon = card.querySelector('.pause-icon') as HTMLElement;
-      const progressBar = card.querySelector('.progress-bar') as HTMLInputElement;
-      const currentTimeEl = card.querySelector('.current-time') as HTMLElement;
-      const durationTimeEl = card.querySelector('.duration-time') as HTMLElement;
+  document.querySelectorAll<HTMLElement>('.track-card').forEach((card) => {
+    const $ = <T extends HTMLElement>(sel: string) => card.querySelector(sel) as T;
+    const audio = $<HTMLAudioElement>('.audio-element');
+    const playBtn = $<HTMLButtonElement>('.play-btn');
+    const bar = $<HTMLInputElement>('.progress-bar');
+    const cur = $('.current-time');
+    const dur = $('.duration-time');
+    const speedBtn = $<HTMLButtonElement>('.speed-btn');
+    const loopBtn = $<HTMLButtonElement>('.loop-btn');
+    const label = card.querySelector('h3')?.textContent ?? '';
+    let speedIdx = 0;
+    let a: number | null = null;
+    let b: number | null = null;
 
-      if (!audio || !playBtn) return;
+    const setPlaying = (on: boolean) => {
+      $('.play-icon').classList.toggle('hidden', on);
+      $('.pause-icon').classList.toggle('hidden', !on);
+      playBtn.setAttribute('aria-label', `${on ? 'Pausar' : 'Reproducir'} ${label}`);
+    };
 
-      const formatTime = (seconds: number) => {
-        if (isNaN(seconds)) return '0:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-      };
-
-      // Cargar duración cuando los metadatos estén listos
-      audio.addEventListener('loadedmetadata', () => {
-        durationTimeEl.textContent = formatTime(audio.duration);
-      });
-
-      // Alternar Play / Pausa
-      playBtn.addEventListener('click', () => {
-        if (audio.paused) {
-          // Pausar cualquier otro audio que esté sonando en la web
-          document.querySelectorAll('audio').forEach((a) => {
-            if (a !== audio && !a.paused) {
-              a.pause();
-            }
-          });
-          audio.play();
-        } else {
-          audio.pause();
-        }
-      });
-
-      audio.addEventListener('play', () => {
-        playIcon.classList.add('hidden');
-        pauseIcon.classList.remove('hidden');
-      });
-
-      audio.addEventListener('pause', () => {
-        playIcon.classList.remove('hidden');
-        pauseIcon.classList.add('hidden');
-      });
-
-      // Actualizar posición mientras suena
-      audio.addEventListener('timeupdate', () => {
-        if (audio.duration) {
-          const percentage = (audio.currentTime / audio.duration) * 100;
-          progressBar.value = percentage.toString();
-          currentTimeEl.textContent = formatTime(audio.currentTime);
-        }
-      });
-
-      // Desplazarse por el audio usando el control deslizante
-      progressBar.addEventListener('input', () => {
-        if (audio.duration) {
-          const seekTime = (parseFloat(progressBar.value) / 100) * audio.duration;
-          audio.currentTime = seekTime;
-        }
-      });
-
-      // Reiniciar al finalizar
-      audio.addEventListener('ended', () => {
-        progressBar.value = '0';
-        currentTimeEl.textContent = '0:00';
-        playIcon.classList.remove('hidden');
-        pauseIcon.classList.add('hidden');
-      });
+    audio.preservesPitch = true; // ir más lento sin bajar el tono
+    audio.addEventListener('loadedmetadata', () => (dur.textContent = fmt(audio.duration)));
+    audio.addEventListener('play', () => setPlaying(true));
+    audio.addEventListener('pause', () => setPlaying(false));
+    audio.addEventListener('ended', () => {
+      bar.value = '0';
+      cur.textContent = '0:00';
+      setPlaying(false);
     });
-  }
 
-  initAudioPlayers();
+    playBtn.addEventListener('click', () => {
+      if (!audio.paused) return audio.pause();
+      document.querySelectorAll('audio').forEach((o) => o !== audio && o.pause());
+      audio.play();
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      if (b !== null && a !== null && audio.currentTime >= b) audio.currentTime = a;
+      if (audio.duration) {
+        bar.value = String((audio.currentTime / audio.duration) * 100);
+        cur.textContent = fmt(audio.currentTime);
+      }
+    });
+
+    bar.addEventListener('input', () => {
+      if (audio.duration) audio.currentTime = (parseFloat(bar.value) / 100) * audio.duration;
+    });
+
+    speedBtn.addEventListener('click', () => {
+      speedIdx = (speedIdx + 1) % SPEEDS.length;
+      audio.playbackRate = SPEEDS[speedIdx];
+      speedBtn.textContent = `${SPEEDS[speedIdx]}×`;
+    });
+
+    // 1.er clic: marca A · 2.º clic: marca B y repite · 3.er clic: quita el bucle
+    loopBtn.addEventListener('click', () => {
+      if (a === null) {
+        a = audio.currentTime;
+        loopBtn.textContent = `A ${fmt(a)} · marca B`;
+        loopBtn.setAttribute('aria-pressed', 'true');
+      } else if (b === null) {
+        if (audio.currentTime <= a + 0.5) return;
+        b = audio.currentTime;
+        loopBtn.textContent = `${fmt(a)}–${fmt(b)} · quitar`;
+      } else {
+        a = b = null;
+        loopBtn.textContent = 'Bucle A-B';
+        loopBtn.setAttribute('aria-pressed', 'false');
+      }
+    });
+  });
 </script>

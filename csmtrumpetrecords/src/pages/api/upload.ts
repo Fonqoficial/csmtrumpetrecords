@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@supabase/supabase-js';
 import { Buffer } from 'buffer';
+import { isValidSession } from '../../lib/auth';
 
 const s3 = new S3Client({
   region: 'auto',
@@ -13,7 +14,7 @@ const s3 = new S3Client({
 });
 
 export const POST: APIRoute = async ({ request, cookies }) => {
-    if (!cookies.has('admin_session')) {
+    if (!isValidSession(cookies.get('admin_session')?.value)) {
         return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401 });
     }
   
@@ -26,6 +27,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     if (!file || !title || !artist) {
       return new Response(JSON.stringify({ error: 'Faltan datos requeridos' }), { status: 400 });
+    }
+
+    if (file.type && !file.type.startsWith('audio/')) {
+      return new Response(JSON.stringify({ error: 'Solo se admiten archivos de audio' }), { status: 400 });
     }
 
     // 1. Preparar el archivo para R2

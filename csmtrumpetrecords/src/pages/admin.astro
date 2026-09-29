@@ -1,7 +1,8 @@
 ---
 import '../styles/global.css';
+import { signSession, isValidSession } from '../lib/auth';
 const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD;
-let isAuthenticated = Astro.cookies.has('admin_session');
+let isAuthenticated = isValidSession(Astro.cookies.get('admin_session')?.value);
 let loginError = false;
 
 if (Astro.request.method === 'POST' && !isAuthenticated) {
@@ -9,7 +10,7 @@ if (Astro.request.method === 'POST' && !isAuthenticated) {
   const password = data.get('password');
   
   if (password === ADMIN_PASSWORD) {
-    Astro.cookies.set('admin_session', 'true', { path: '/', maxAge: 60 * 60 * 24 * 7 });
+    Astro.cookies.set('admin_session', signSession(), { path: '/', maxAge: 60 * 60 * 24 * 7, httpOnly: true, secure: import.meta.env.PROD, sameSite: 'lax' });
     isAuthenticated = true;
   } else {
     loginError = true;
