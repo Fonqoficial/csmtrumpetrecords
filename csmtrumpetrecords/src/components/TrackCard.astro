@@ -1,6 +1,6 @@
 ---
 import type { Track } from '../types';
-import { Download } from 'lucide-astro';
+import { Download, Play, Pause, Music } from 'lucide-astro';
 
 interface Props {
   track: Track;
@@ -9,41 +9,149 @@ interface Props {
 const { track } = Astro.props;
 ---
 
-<article className="bg-neutral-900 border border-neutral-800 rounded-xl p-5 hover:border-neutral-700 transition flex flex-col md:flex-row items-center justify-between gap-4">
-  <!-- Info de la pista -->
-  <div className="flex items-center gap-4 w-full md:w-1/3">
+<article
+  class="track-card bg-neutral-900 border border-neutral-800 hover:border-neutral-700/80 rounded-xl p-4 sm:p-5 transition flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-sm"
+  data-title={track.title.toLowerCase()}
+  data-artist={track.artist.toLowerCase()}
+>
+  <!-- Información del Audio -->
+  <div class="flex items-center gap-4 min-w-55">
     {track.cover_url ? (
-      <img src={track.cover_url} alt={track.title} className="w-14 h-14 rounded-lg object-cover" />
+      <img src={track.cover_url} alt={track.title} class="w-12 h-12 rounded-lg object-cover shrink-0" />
     ) : (
-      <div className="w-14 h-14 rounded-lg bg-neutral-800 flex items-center justify-center text-xs text-neutral-500">
-        MP3
+      <div class="w-12 h-12 rounded-lg bg-neutral-800 border border-neutral-700/50 flex items-center justify-center text-indigo-400 shrink-0">
+        <Music size={22} />
       </div>
     )}
-    <div>
-      <h3 className="font-semibold text-white text-lg leading-tight">{track.title}</h3>
-      <p className="text-sm text-neutral-400 mt-1">{track.artist}</p>
+    <div class="overflow-hidden">
+      <h3 class="font-semibold text-white text-base truncate leading-tight">{track.title}</h3>
+      <p class="text-xs text-neutral-400 truncate mt-1">{track.artist}</p>
     </div>
   </div>
 
-  <!-- Reproductor Nactivo -->
-  <div className="w-full md:w-1/2">
-    <audio controls className="w-full h-10 rounded-lg accent-indigo-500">
-      <source src={track.audio_url} type="audio/mpeg" />
-      Tu navegador no soporta el reproductor de audio.
-    </audio>
+  <!-- Reproductor Personalizado -->
+  <div class="custom-player flex-1 flex items-center gap-3 bg-neutral-950/60 p-2.5 px-4 rounded-lg border border-neutral-800/80">
+    <audio class="audio-element" src={track.audio_url} preload="metadata"></audio>
+
+    <button
+      type="button"
+      class="play-btn bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-full transition-transform active:scale-95 shrink-0"
+      aria-label="Reproducir"
+    >
+      <span class="play-icon"><Play size={18} class="fill-current" /></span>
+      <span class="pause-icon hidden"><Pause size={18} class="fill-current" /></span>
+    </button>
+
+    <!-- Barra de Progreso y Tiempos -->
+    <div class="flex-1 flex flex-col gap-1">
+      <input
+        type="range"
+        class="progress-bar w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+        value="0"
+        min="0"
+        max="100"
+        step="0.1"
+      />
+      <div class="flex justify-between text-[11px] text-neutral-400 font-mono">
+        <span class="current-time">0:00</span>
+        <span class="duration-time">0:00</span>
+      </div>
+    </div>
   </div>
 
   <!-- Botón de Descarga -->
-  <div>
+  <div class="flex items-center justify-end">
     <a
       href={track.audio_url}
       download={`${track.title}.mp3`}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition"
+      class="inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white px-3.5 py-2.5 rounded-lg font-medium text-xs border border-neutral-700 transition"
     >
-      <Download size={18} />
-      <span>Descargar</span>
+      <Download size={15} />
+      <span class="hidden sm:inline">Descargar</span>
     </a>
   </div>
 </article>
+
+<script>
+  function initAudioPlayers() {
+    const cards = document.querySelectorAll('.track-card');
+
+    cards.forEach((card) => {
+      const audio = card.querySelector('.audio-element') as HTMLAudioElement;
+      const playBtn = card.querySelector('.play-btn') as HTMLButtonElement;
+      const playIcon = card.querySelector('.play-icon') as HTMLElement;
+      const pauseIcon = card.querySelector('.pause-icon') as HTMLElement;
+      const progressBar = card.querySelector('.progress-bar') as HTMLInputElement;
+      const currentTimeEl = card.querySelector('.current-time') as HTMLElement;
+      const durationTimeEl = card.querySelector('.duration-time') as HTMLElement;
+
+      if (!audio || !playBtn) return;
+
+      const formatTime = (seconds: number) => {
+        if (isNaN(seconds)) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+      };
+
+      // Cargar duración cuando los metadatos estén listos
+      audio.addEventListener('loadedmetadata', () => {
+        durationTimeEl.textContent = formatTime(audio.duration);
+      });
+
+      // Alternar Play / Pausa
+      playBtn.addEventListener('click', () => {
+        if (audio.paused) {
+          // Pausar cualquier otro audio que esté sonando en la web
+          document.querySelectorAll('audio').forEach((a) => {
+            if (a !== audio && !a.paused) {
+              a.pause();
+            }
+          });
+          audio.play();
+        } else {
+          audio.pause();
+        }
+      });
+
+      audio.addEventListener('play', () => {
+        playIcon.classList.add('hidden');
+        pauseIcon.classList.remove('hidden');
+      });
+
+      audio.addEventListener('pause', () => {
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+      });
+
+      // Actualizar posición mientras suena
+      audio.addEventListener('timeupdate', () => {
+        if (audio.duration) {
+          const percentage = (audio.currentTime / audio.duration) * 100;
+          progressBar.value = percentage.toString();
+          currentTimeEl.textContent = formatTime(audio.currentTime);
+        }
+      });
+
+      // Desplazarse por el audio usando el control deslizante
+      progressBar.addEventListener('input', () => {
+        if (audio.duration) {
+          const seekTime = (parseFloat(progressBar.value) / 100) * audio.duration;
+          audio.currentTime = seekTime;
+        }
+      });
+
+      // Reiniciar al finalizar
+      audio.addEventListener('ended', () => {
+        progressBar.value = '0';
+        currentTimeEl.textContent = '0:00';
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+      });
+    });
+  }
+
+  initAudioPlayers();
+</script>

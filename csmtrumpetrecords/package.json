@@ -12,9 +12,12 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/vercel": "^11.0.11",
+    "@aws-sdk/client-s3": "^3.1142.0",
     "@supabase/supabase-js": "^2.117.2",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.3.5",
+    "buffer": "^6.0.3",
     "lucide-astro": "^0.556.0",
     "tailwindcss": "^4.3.3"
   },

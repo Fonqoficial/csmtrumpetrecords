@@ -2,14 +2,14 @@
 import TrackCard from '../components/TrackCard.astro';
 import { supabase } from '../lib/supabase';
 import type { Track } from '../types';
+import { Search } from 'lucide-astro';
+import '../styles/global.css';
 
-// 1. Consultamos los audios a Supabase (ordenados por los más recientes)
 const { data: tracks, error } = await supabase
   .from('tracks')
   .select('*')
   .order('created_at', { ascending: false });
 
-// Si hay un error en la consola, nos avisará
 if (error) {
   console.error('Error al obtener los audios:', error.message);
 }
@@ -22,44 +22,89 @@ if (error) {
     <meta name="viewport" content="width=device-width" />
     <title>CSMTrumpetRecords</title>
   </head>
-  <body className="bg-neutral-950 text-white min-h-screen font-sans">
-    <header className="border-b border-neutral-800 bg-neutral-900/50 backdrop-blur py-6">
-      <div className="max-w-5xl mx-auto px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-          CSMTrumpetRecords
-        </h1>
-        <span className="text-xs bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full border border-neutral-700">
-          Grabaciones en mp3 del aula de Trompeta del CSM de Sevilla
-        </span>
+  <body class="bg-neutral-950 text-white min-h-screen font-sans">
+    <header class="border-b border-neutral-800/80 bg-neutral-900/50 backdrop-blur py-6 sticky top-0 z-10">
+      <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 class="text-2xl font-bold bg-linear-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            CSMTrumpetRecords
+          </h1>
+          <p class="text-xs text-neutral-400 mt-0.5">Grabaciones en mp3 del aula de Trompeta del CSM de Sevilla</p>
+        </div>
       </div>
     </header>
 
-    <main className="max-w-5xl mx-auto px-4 py-10">
-      <section className="mb-8">
-        <h2 className="text-xl font-bold text-neutral-200">Grabaciones</h2>
-        <p className="text-neutral-400 text-sm mt-1">Escucha directamente en la web o descarga los archivos en tu dispositivo.</p>
+    <main class="max-w-5xl mx-auto px-4 py-10">
+      <section class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-neutral-200">Grabaciones</h2>
+          <p class="text-neutral-400 text-sm mt-1">Escucha directamente en la web o descarga los archivos en tu dispositivo.</p>
+        </div>
+
+        <!-- Campo de Búsqueda -->
+        <div class="relative w-full md:w-72">
+          <input
+            type="search"
+            id="search-input"
+            placeholder="Buscar obra o intérprete..."
+            class="w-full bg-neutral-900 border border-neutral-800 text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-indigo-500 transition placeholder:text-neutral-500"
+          />
+          <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none">
+            <Search size={18} />
+          </div>
+        </div>
       </section>
 
-      <section className="flex flex-col gap-4">
-        {/* Manejo de estado: Error */}
+      <section class="flex flex-col gap-4">
         {error && (
-          <div className="p-4 bg-red-900/20 border border-red-500/50 text-red-400 rounded-lg text-center">
+          <div class="p-4 bg-red-900/20 border border-red-500/50 text-red-400 rounded-lg text-center text-sm">
             Hubo un problema al cargar el catálogo de audios.
           </div>
         )}
 
-        {/* Manejo de estado: Vacío */}
         {tracks && tracks.length === 0 && !error && (
-          <div className="p-12 text-center border border-dashed border-neutral-800 rounded-xl text-neutral-500">
+          <div class="p-12 text-center border border-dashed border-neutral-800 rounded-xl text-neutral-500 text-sm">
             Todavía no hay audios subidos. ¡Añade tu primer MP3 en Supabase!
           </div>
         )}
 
-        {/* Renderizado de la lista real */}
+        <div id="no-results" class="hidden p-12 text-center border border-dashed border-neutral-800 rounded-xl text-neutral-500 text-sm">
+          No se encontraron grabaciones que coincidan con tu búsqueda.
+        </div>
+
         {tracks && tracks.map((track: Track) => (
           <TrackCard track={track} />
         ))}
       </section>
     </main>
+
+    <script>
+      const searchInput = document.getElementById('search-input') as HTMLInputElement;
+      const trackCards = document.querySelectorAll('.track-card');
+      const noResults = document.getElementById('no-results');
+
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          const query = (e.target as HTMLInputElement).value.toLowerCase().trim();
+          let visibleCount = 0;
+
+          trackCards.forEach((card) => {
+            const title = card.getAttribute('data-title') || '';
+            const artist = card.getAttribute('data-artist') || '';
+
+            if (title.includes(query) || artist.includes(query)) {
+              (card as HTMLElement).style.display = 'flex';
+              visibleCount++;
+            } else {
+              (card as HTMLElement).style.display = 'none';
+            }
+          });
+
+          if (noResults) {
+            noResults.style.display = visibleCount === 0 && trackCards.length > 0 ? 'block' : 'none';
+          }
+        });
+      }
+    </script>
   </body>
 </html>
