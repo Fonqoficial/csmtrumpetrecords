@@ -2,8 +2,10 @@ export interface Track {
   id: string;
   title: string;
   artist: string;
-  duration: string;
+  category?: string;
+  duration?: string;
   audio_url: string; // URL alojada en Cloudflare R2
-  cover_url?: string; // Opcional: carátula de la pista
+  score_url?: string | null; // Partitura en PDF (opcional)
+  cover_url?: string;
   created_at?: string;
 }

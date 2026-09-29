@@ -1,117 +1,104 @@
 ---
+import Layout from '../layouts/Layout.astro';
 import TrackCard from '../components/TrackCard.astro';
 import { supabase } from '../lib/supabase';
 import type { Track } from '../types';
-import { Search } from 'lucide-astro';
-import '../styles/global.css';
+import { FileText } from 'lucide-astro';
 
-const { data: tracks, error } = await supabase
-  .from('tracks')
-  .select('*')
-  .order('title', { ascending: true });
+const { data, error } = await supabase.from('tracks').select('*');
+if (error) console.error('Error al obtener los audios:', error.message);
 
-if (error) {
-  console.error('Error al obtener los audios:', error.message);
+// "Concerto nº 1 - 1º Movement" -> obra + movimiento
+const split = (t: string) => {
+  const m = t.match(/^(.*?)\s+[-–—]\s+(.+)$/);
+  return m ? { work: m[1].trim(), mov: m[2].trim() } : { work: t.trim(), mov: '' };
+};
+const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+const groups = new Map<string, { work: string; artist: string; tracks: (Track & { mov: string })[] }>();
+for (const t of (data ?? []) as Track[]) {
+  const { work, mov } = split(t.title);
+  const key = `${t.artist}|${work}`;
+  if (!groups.has(key)) groups.set(key, { work, artist: t.artist, tracks: [] });
+  groups.get(key)!.tracks.push({ ...t, mov });
 }
+const works = [...groups.values()]
+  .sort((a, b) => a.artist.localeCompare(b.artist, 'es') || a.work.localeCompare(b.work, 'es', { numeric: true }))
+  .map((g) => ({ ...g, tracks: g.tracks.sort((a, b) => a.mov.localeCompare(b.mov, 'es', { numeric: true })) }));
+const cats = [...new Set((data ?? []).map((t: Track) => t.category).filter(Boolean))] as string[];
 ---
 
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width" />
-    <title>CSMTrumpetRecords · Grabaciones del aula de Trompeta</title>
-    <meta name="description" content="Acompañamientos y grabaciones en mp3 del aula de Trompeta del CSM de Sevilla. Escucha, ajusta la velocidad, repite pasajes y descarga." />
-    <meta name="theme-color" content="#0a0a0a" />
-    <meta property="og:title" content="CSMTrumpetRecords" />
-    <meta property="og:description" content="Grabaciones del aula de Trompeta del CSM de Sevilla" />
-    <meta property="og:type" content="website" />
-  </head>
-  <body class="bg-neutral-950 text-white min-h-screen font-sans">
-    <header class="border-b border-neutral-800/80 bg-neutral-900/50 backdrop-blur py-6 sticky top-0 z-10">
-      <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 class="text-2xl font-bold bg-linear-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-            CSMTrumpetRecords
-          </h1>
-          <p class="text-xs text-neutral-400 mt-0.5">Grabaciones en mp3 del aula de Trompeta del CSM de Sevilla</p>
-        </div>
-      </div>
+<Layout
+  title="CSMTrumpetRecords · Aula de Trompeta del CSM de Sevilla"
+  description="Acompañamientos y grabaciones en mp3 del aula de Trompeta del Conservatorio Superior de Música de Sevilla, con control de velocidad y bucle."
+>
+  <div class="wrap">
+    <header class="masthead">
+      <h1>CSMTrumpetRecords</h1>
+      <p>Grabaciones del aula de Trompeta del Conservatorio Superior de Música de Sevilla.</p>
     </header>
 
-    <main class="max-w-5xl mx-auto px-4 py-10">
-      <section class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h2 class="text-xl font-bold text-neutral-200">Grabaciones</h2>
-          <p class="text-neutral-400 text-sm mt-1">Escucha directamente en la web o descarga los archivos en tu dispositivo.</p>
+    <div class="tools">
+      <input type="search" id="q" placeholder="Buscar por obra o compositor" aria-label="Buscar por obra o compositor" />
+      {cats.length > 1 && (
+        <div class="cats" role="group" aria-label="Filtrar por categoría">
+          <button type="button" class="cat" data-cat="" aria-pressed="true">Todas</button>
+          {cats.map((c) => <button type="button" class="cat" data-cat={c} aria-pressed="false">{c}</button>)}
         </div>
+      )}
+    </div>
 
-        <!-- Campo de Búsqueda -->
-        <div class="relative w-full md:w-72">
-          <input
-            type="search"
-            id="search-input"
-            placeholder="Buscar obra o intérprete..."
-            class="w-full bg-neutral-900 border border-neutral-800 text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-indigo-500 transition placeholder:text-neutral-500"
-          />
-          <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none">
-            <Search size={18} />
-          </div>
-        </div>
-      </section>
+    <main>
+      {error && <p class="empty">No se han podido cargar las grabaciones. Recarga la página en unos segundos.</p>}
+      {!error && works.length === 0 && <p class="empty">Aún no hay grabaciones. Vuelve pronto.</p>}
 
-      <section class="flex flex-col gap-4">
-        {error && (
-          <div class="p-4 bg-red-900/20 border border-red-500/50 text-red-400 rounded-lg text-center text-sm">
-            Hubo un problema al cargar el catálogo de audios.
-          </div>
-        )}
-
-        {tracks && tracks.length === 0 && !error && (
-          <div class="p-12 text-center border border-dashed border-neutral-800 rounded-xl text-neutral-500 text-sm">
-            Aún no hay grabaciones. Vuelve pronto.
-          </div>
-        )}
-
-        <div id="no-results" class="hidden p-12 text-center border border-dashed border-neutral-800 rounded-xl text-neutral-500 text-sm">
-          No se encontraron grabaciones que coincidan con tu búsqueda.
-        </div>
-
-        {tracks && tracks.map((track: Track) => (
-          <TrackCard track={track} />
-        ))}
-      </section>
+      {works.map((w) => {
+        const score = w.tracks.find((t) => t.score_url)?.score_url;
+        return (
+          <section class="work" data-search={norm(`${w.work} ${w.artist}`)} data-cats={w.tracks.map((t) => t.category).join('|')}>
+            <div class="work-head">
+              <div>
+                <h2>{w.work}</h2>
+                <p class="composer">{w.artist}</p>
+              </div>
+              {score && <a class="score" href={score} target="_blank" rel="noopener noreferrer"><FileText size={15} />Partitura (PDF)</a>}
+            </div>
+            <ol class="movs">
+              {w.tracks.map((t) => <TrackCard track={t} work={w.work} />)}
+            </ol>
+          </section>
+        );
+      })}
+      <p id="none" class="empty" hidden>Ninguna grabación coincide con la búsqueda.</p>
     </main>
 
-    <script>
-      const searchInput = document.getElementById('search-input') as HTMLInputElement;
-      const trackCards = document.querySelectorAll('.track-card');
-      const noResults = document.getElementById('no-results');
+    <footer class="site-foot">Material de estudio del aula de Trompeta. Grabaciones de uso interno del alumnado.</footer>
+  </div>
 
-      const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  <script>
+    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const q = document.getElementById('q') as HTMLInputElement;
+    const none = document.getElementById('none')!;
+    const catBtns = document.querySelectorAll<HTMLButtonElement>('.cat');
+    let cat = '';
 
-      if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-          const query = norm((e.target as HTMLInputElement).value.trim());
-          let visibleCount = 0;
-
-          trackCards.forEach((card) => {
-            const title = norm(card.getAttribute('data-title') || '');
-            const artist = norm(card.getAttribute('data-artist') || '');
-
-            if (title.includes(query) || artist.includes(query)) {
-              (card as HTMLElement).style.display = 'flex';
-              visibleCount++;
-            } else {
-              (card as HTMLElement).style.display = 'none';
-            }
-          });
-
-          if (noResults) {
-            noResults.style.display = visibleCount === 0 && trackCards.length > 0 ? 'block' : 'none';
-          }
-        });
-      }
-    </script>
-  </body>
-</html>
+    const apply = () => {
+      const term = norm(q.value.trim());
+      let shown = 0;
+      document.querySelectorAll<HTMLElement>('.work').forEach((w) => {
+        const ok = (w.dataset.search ?? '').includes(term) && (!cat || (w.dataset.cats ?? '').split('|').includes(cat));
+        w.hidden = !ok;
+        if (ok) shown++;
+      });
+      none.hidden = shown > 0;
+    };
+    q.addEventListener('input', apply);
+    catBtns.forEach((b) =>
+      b.addEventListener('click', () => {
+        cat = b.dataset.cat ?? '';
+        catBtns.forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+        apply();
+      }),
+    );
+  </script>
+</Layout>

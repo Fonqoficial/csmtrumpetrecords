@@ -1,150 +1,100 @@
 ---
 import type { Track } from '../types';
-import { Download, Play, Pause, Music } from 'lucide-astro';
+import { Download, Play, Pause } from 'lucide-astro';
 
-interface Props {
-  track: Track;
-}
-
-const { track } = Astro.props;
+interface Props { track: Track & { mov: string }; work: string; }
+const { track, work } = Astro.props;
 // "1º Movement" -> "1.er movimiento"
-const label = track.title.replace(/(\d)\s*º\s*Movement/i, (_, n) => `${n}.${n === '1' || n === '3' ? 'er' : 'º'} movimiento`);
-const chip =
-  'text-[11px] px-2 py-1 rounded-md border border-neutral-700 text-neutral-300 hover:bg-neutral-800 transition focus-visible:outline-2 focus-visible:outline-indigo-400 aria-pressed:border-indigo-500 aria-pressed:text-indigo-300';
+const name = track.mov
+  ? track.mov.replace(/(\d+)\s*º\s*Movement/i, (_, n) => `${n}.${['1', '3'].includes(n) ? 'er' : 'º'} movimiento`)
+  : 'Grabación completa';
 ---
 
-<article
-  class="track-card bg-neutral-900 border border-neutral-800 hover:border-neutral-700/80 rounded-xl p-4 sm:p-5 transition flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-sm"
-  data-title={track.title.toLowerCase()}
-  data-artist={track.artist.toLowerCase()}
->
-  <div class="flex items-center gap-4 min-w-55">
-    {track.cover_url ? (
-      <img src={track.cover_url} alt="" class="w-12 h-12 rounded-lg object-cover shrink-0" />
-    ) : (
-      <div class="w-12 h-12 rounded-lg bg-neutral-800 border border-neutral-700/50 flex items-center justify-center text-indigo-400 shrink-0">
-        <Music size={22} />
+<li class="mov" data-label={`${work}, ${name}`}>
+  <audio src={track.audio_url} preload="metadata"></audio>
+  <button type="button" class="play" aria-label={`Reproducir ${work}, ${name}`}>
+    <span class="i-play"><Play size={16} class="fill-current" /></span>
+    <span class="i-pause" hidden><Pause size={16} class="fill-current" /></span>
+  </button>
+  <div><span class="mov-name">{name}</span><span class="dur">0:00</span></div>
+  <a class="dl" href={`/api/download/${track.id}`} aria-label={`Descargar ${work}, ${name}`}><Download size={15} />Descargar</a>
+  <div class="ctl">
+    <input type="range" class="bar" aria-label="Posición de reproducción" value="0" min="0" max="100" step="0.1" />
+    <div class="ctl-row">
+      <span class="cur">0:00</span>
+      <div class="chips">
+        <button type="button" class="chip speed" aria-label="Cambiar velocidad de reproducción">1×</button>
+        <button type="button" class="chip loop" aria-pressed="false" title="Marca el inicio (A) y el final (B) de un pasaje para repetirlo">Bucle A-B</button>
       </div>
-    )}
-    <div class="overflow-hidden">
-      <h3 class="font-semibold text-white text-base truncate leading-tight" title={label}>{label}</h3>
-      <p class="text-xs text-neutral-400 truncate mt-1">{track.artist}</p>
+      <span class="total">0:00</span>
     </div>
   </div>
-
-  <div class="custom-player flex-1 flex items-center gap-3 bg-neutral-950/60 p-2.5 px-4 rounded-lg border border-neutral-800/80">
-    <audio class="audio-element" src={track.audio_url} preload="metadata"></audio>
-
-    <button
-      type="button"
-      class="play-btn bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-full transition-transform active:scale-95 shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
-      aria-label={`Reproducir ${label}`}
-    >
-      <span class="play-icon"><Play size={18} class="fill-current" /></span>
-      <span class="pause-icon hidden"><Pause size={18} class="fill-current" /></span>
-    </button>
-
-    <div class="flex-1 flex flex-col gap-2 min-w-0">
-      <input
-        type="range"
-        class="progress-bar w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400"
-        aria-label="Posición de reproducción"
-        value="0"
-        min="0"
-        max="100"
-        step="0.1"
-      />
-      <div class="flex items-center justify-between gap-2 text-[11px] text-neutral-400 font-mono">
-        <span class="current-time">0:00</span>
-        <div class="flex gap-1.5 font-sans">
-          <button type="button" class={`speed-btn ${chip}`} aria-label="Cambiar velocidad de reproducción">1×</button>
-          <button type="button" class={`loop-btn ${chip}`} aria-pressed="false" title="Marca el inicio (A) y el final (B) de un pasaje para repetirlo">Bucle A-B</button>
-        </div>
-        <span class="duration-time">0:00</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="flex items-center justify-end">
-    <a
-      href={`/api/download/${track.id}`}
-      aria-label={`Descargar ${label}`}
-      class="inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white px-3.5 py-2.5 rounded-lg font-medium text-xs border border-neutral-700 transition focus-visible:outline-2 focus-visible:outline-indigo-400"
-    >
-      <Download size={15} />
-      <span class="hidden sm:inline">Descargar</span>
-    </a>
-  </div>
-</article>
+</li>
 
 <script>
   const SPEEDS = [1, 0.9, 0.75, 0.5];
   const fmt = (s: number) => (isNaN(s) ? '0:00' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`);
 
-  document.querySelectorAll<HTMLElement>('.track-card').forEach((card) => {
-    const $ = <T extends HTMLElement>(sel: string) => card.querySelector(sel) as T;
-    const audio = $<HTMLAudioElement>('.audio-element');
-    const playBtn = $<HTMLButtonElement>('.play-btn');
-    const bar = $<HTMLInputElement>('.progress-bar');
-    const cur = $('.current-time');
-    const dur = $('.duration-time');
-    const speedBtn = $<HTMLButtonElement>('.speed-btn');
-    const loopBtn = $<HTMLButtonElement>('.loop-btn');
-    const label = card.querySelector('h3')?.textContent ?? '';
+  document.querySelectorAll<HTMLElement>('.mov').forEach((row) => {
+    const $ = <T extends HTMLElement>(sel: string) => row.querySelector(sel) as T;
+    const audio = $<HTMLAudioElement>('audio');
+    const playBtn = $<HTMLButtonElement>('.play');
+    const bar = $<HTMLInputElement>('.bar');
+    const speedBtn = $<HTMLButtonElement>('.speed');
+    const loopBtn = $<HTMLButtonElement>('.loop');
+    const label = row.dataset.label ?? '';
     let speedIdx = 0;
     let a: number | null = null;
     let b: number | null = null;
 
     const setPlaying = (on: boolean) => {
-      $('.play-icon').classList.toggle('hidden', on);
-      $('.pause-icon').classList.toggle('hidden', !on);
+      $('.i-play').hidden = on;
+      $('.i-pause').hidden = !on;
       playBtn.setAttribute('aria-label', `${on ? 'Pausar' : 'Reproducir'} ${label}`);
     };
 
-    audio.preservesPitch = true; // ir más lento sin bajar el tono
-    audio.addEventListener('loadedmetadata', () => (dur.textContent = fmt(audio.duration)));
+    audio.preservesPitch = true; // más lento sin bajar el tono
+    audio.addEventListener('loadedmetadata', () => {
+      $('.total').textContent = fmt(audio.duration);
+      $('.dur').textContent = fmt(audio.duration);
+    });
     audio.addEventListener('play', () => setPlaying(true));
     audio.addEventListener('pause', () => setPlaying(false));
     audio.addEventListener('ended', () => {
       bar.value = '0';
-      cur.textContent = '0:00';
+      $('.cur').textContent = '0:00';
       setPlaying(false);
     });
-
     playBtn.addEventListener('click', () => {
       if (!audio.paused) return audio.pause();
       document.querySelectorAll('audio').forEach((o) => o !== audio && o.pause());
       audio.play();
     });
-
     audio.addEventListener('timeupdate', () => {
-      if (b !== null && a !== null && audio.currentTime >= b) audio.currentTime = a;
+      if (a !== null && b !== null && audio.currentTime >= b) audio.currentTime = a;
       if (audio.duration) {
         bar.value = String((audio.currentTime / audio.duration) * 100);
-        cur.textContent = fmt(audio.currentTime);
+        $('.cur').textContent = fmt(audio.currentTime);
       }
     });
-
     bar.addEventListener('input', () => {
       if (audio.duration) audio.currentTime = (parseFloat(bar.value) / 100) * audio.duration;
     });
-
     speedBtn.addEventListener('click', () => {
       speedIdx = (speedIdx + 1) % SPEEDS.length;
       audio.playbackRate = SPEEDS[speedIdx];
       speedBtn.textContent = `${SPEEDS[speedIdx]}×`;
     });
-
-    // 1.er clic: marca A · 2.º clic: marca B y repite · 3.er clic: quita el bucle
+    // 1.er clic: marca A · 2.º: marca B y repite · 3.º: quita el bucle
     loopBtn.addEventListener('click', () => {
       if (a === null) {
         a = audio.currentTime;
-        loopBtn.textContent = `A ${fmt(a)} · marca B`;
+        loopBtn.textContent = `A ${fmt(a)}, marca B`;
         loopBtn.setAttribute('aria-pressed', 'true');
       } else if (b === null) {
         if (audio.currentTime <= a + 0.5) return;
         b = audio.currentTime;
-        loopBtn.textContent = `${fmt(a)}–${fmt(b)} · quitar`;
+        loopBtn.textContent = `${fmt(a)} a ${fmt(b)}, quitar`;
       } else {
         a = b = null;
         loopBtn.textContent = 'Bucle A-B';

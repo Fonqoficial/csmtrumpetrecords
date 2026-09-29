@@ -38,6 +38,18 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const buffer = Buffer.from(arrayBuffer);
     const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
 
+    // Partitura opcional: se sube una sola vez por lote y se reutiliza su URL
+    const score = formData.get('score') as File | null;
+    let scoreUrl = (formData.get('score_url') as string) || null;
+    if (score && score.size > 0) {
+      if (score.type !== 'application/pdf') {
+        return new Response(JSON.stringify({ error: 'La partitura debe ser un PDF' }), { status: 400 });
+      }
+      const key = `${Date.now()}-${score.name.replace(/\s+/g, '-')}`;
+      await s3.send(new PutObjectCommand({ Bucket: import.meta.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(await score.arrayBuffer()), ContentType: 'application/pdf' }));
+      scoreUrl = `${import.meta.env.PUBLIC_R2_DOMAIN}/${key}`;
+    }
+
     // 2. Subir a Cloudflare R2
     await s3.send(new PutObjectCommand({
       Bucket: import.meta.env.R2_BUCKET_NAME,
@@ -59,13 +71,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         title,
         artist,
         category: category || 'General',
-        audio_url: publicUrl
+        audio_url: publicUrl,
+        score_url: scoreUrl
       }
     ]);
 
     if (dbError) throw new Error(dbError.message);
 
-    return new Response(JSON.stringify({ success: true, url: publicUrl }), { status: 200 });
+    return new Response(JSON.stringify({ success: true, url: publicUrl, score_url: scoreUrl }), { status: 200 });
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
